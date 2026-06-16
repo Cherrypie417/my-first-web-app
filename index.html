@@ -1,12 +1,348 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My GitHub Pages Site</title>
+    <title>AI恋愛シミュレーター(フラットUI版)</title>
+    <style>
+        /* 淡く彩度の低い、グラデーション無しのフラットな設定 */
+        body { margin: 0; font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f0f4f8; display: flex; justify-content: center; align-items: center; height: 100vh; color: #333; overflow: hidden; }
+        
+        #game-container { width: 900px; height: 700px; background-color: #ffffff; border: 3px solid #dce2e8; border-radius: 8px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05); position: relative; overflow: hidden; display: flex; flex-direction: column; }
+        
+        /* ステータスバー */
+        #status-bar { padding: 12px 20px; background-color: #e1e8ef; color: #556270; display: flex; justify-content: flex-start; gap: 30px; font-weight: bold; border-bottom: 1px solid #dce2e8; position: absolute; top: 0; left: 0; width: 100%; box-sizing: border-box; z-index: 10; }
+        #money-display-container { font-size: 20px; font-family: 'Helvetica Neue', Arial, sans-serif; }
+        #affection-display { font-size: 18px; }
+
+        /* キャラクター表示エリア（背景も淡い単色に） */
+        #character-area { flex-grow: 1; display: flex; justify-content: center; align-items: flex-end; background-color: #f7f9fc; position: relative; padding-top: 50px; overflow: hidden; }
+        
+        /* キャラクター画像 (前回調整した座標を維持) */
+        #character-img { 
+            height: 80%; 
+            width: auto; 
+            object-fit: contain; 
+            transition: 0.3s; 
+            position: relative; 
+            z-index: 5; 
+            image-rendering: pixelated; 
+            transform: scale(2); 
+            transform-origin: bottom; 
+            bottom: -150px; 
+            left: 0px; 
+        }
+
+        /* メッセージ＆システムエリア */
+        #bottom-area { height: 220px; background-color: #ffffff; border-top: 1px solid #dce2e8; padding: 20px; box-sizing: border-box; display: flex; flex-direction: column; position: relative; z-index: 10; }
+        
+        #dialogue-box { flex-grow: 1; font-size: 18px; margin-bottom: 10px; padding: 15px; background-color: #f4f7f9; border-radius: 6px; border: 1px solid #e1e8ef; overflow-y: auto; color: #444; line-height: 1.5; }
+        #dialogue-box strong { color: #6c7a89; }
+
+        /* フラットで淡いボタン */
+        #action-menu { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+        button { padding: 12px 24px; font-size: 16px; cursor: pointer; border: 1px solid #ccd1d9; border-radius: 6px; background-color: #e6e9ed; color: #434a54; font-weight: bold; transition: 0.2s; letter-spacing: 1px; }
+        button:hover { background-color: #ccd1d9; }
+        button:disabled { background-color: #f5f7fa; border-color: #e6e9ed; color: #aab2bd; cursor: not-allowed; }
+        
+        /* 特別なボタンも淡いパステルカラーに */
+        button#btn-work { background-color: #fcf8e3; border-color: #faebcc; color: #8a6d3b; }
+        button#btn-work:hover { background-color: #faf2cc; }
+        button#btn-confess { background-color: #f2dede; border-color: #ebccd1; color: #a94442; }
+        button#btn-confess:hover { background-color: #ebccd1; }
+
+        /* サブメニュー */
+        .sub-menu { display: none; margin-top: 10px; gap: 10px; justify-content: center; align-items: center; width: 100%; box-sizing: border-box; }
+        input[type="text"] { padding: 10px; width: 65%; font-size: 16px; border: 1px solid #ccd1d9; border-radius: 6px; background-color: #ffffff; color: #333; outline: none; }
+        input[type="text"]:focus { border-color: #aab2bd; }
+        select { padding: 10px; font-size: 16px; border: 1px solid #ccd1d9; border-radius: 6px; background-color: #ffffff; color: #333; outline: none; }
+    </style>
 </head>
 <body>
-    <h1>Welcome to My GitHub Pages Site</h1>
-    <p>This is my first GitHub Pages deployment!</p>
+
+<div id="game-container">
+    <div id="status-bar">
+        <div id="money-display-container">¥ <span id="money-display">16,109</span></div>
+        <div>好感度: <span id="affection-display">0</span> / 100</div>
+    </div>
+
+    <div id="character-area">
+        <img id="character-img" src="通常-removebg-preview.png" alt="キャラクター">
+    </div>
+
+    <div id="bottom-area">
+        <div id="dialogue-box">ここに会話が表示されます。</div>
+        
+        <div id="action-menu">
+            <button onclick="openChat()">会話</button>
+            <button onclick="openGift()">プレゼント</button>
+            <button id="btn-work" onclick="work()">仕事</button>
+            <button onclick="openShop()">買い物</button>
+            <button id="btn-confess" onclick="confess()">告白</button>
+        </div>
+
+        <div id="sub-menu-chat" class="sub-menu">
+            <input type="text" id="chat-input" placeholder="話しかける内容を入力...">
+            <button onclick="sendChat()">送信</button>
+            <button onclick="closeSubMenu()">戻る</button>
+        </div>
+
+        <div id="sub-menu-shop" class="sub-menu">
+            <select id="shop-select">
+                <option value="1000">ケーキ (1,000円)</option>
+                <option value="5000">ネックレス (5,000円)</option>
+            </select>
+            <button onclick="buyItem()">買う</button>
+            <button onclick="closeSubMenu()">戻る</button>
+        </div>
+
+        <div id="sub-menu-gift" class="sub-menu">
+            <select id="gift-select"></select>
+            <button onclick="giveGift()">渡す</button>
+            <button onclick="closeSubMenu()">戻る</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ==========================================
+    // 【重要】本物のAIを動かすための設定
+    // Google AI Studioで取得したAPIキーを以下の "" の中に入れてください。
+    // そのままならダミーAIが動きます。
+    // ※注意: APIキーを入れたままGitHubで公開するとキーが盗まれる危険があります！公開時は抜いてください。
+    // ==========================================
+    const GEMINI_API_KEY = ""; 
+
+    // --- ゲームの初期状態 ---
+    let state = {
+        money: 16109,
+        affection: 0,
+        inventory: {
+            "ケーキ": 0,
+            "ネックレス": 0
+        }
+    };
+
+    // --- 画像の定義 ---
+    const expressions = {
+        normal: "通常-removebg-preview.png",
+        close: "目閉じ-removebg-preview.png",
+        smile: "笑顔.png",
+        angry: "怒り-removebg-preview.png"
+    };
+
+    const dialogueBox = document.getElementById('dialogue-box');
+
+    function updateUI() {
+        document.getElementById('money-display').innerText = state.money.toLocaleString('ja-JP');
+        document.getElementById('affection-display').innerText = state.affection;
+    }
+
+    function showMessage(text) {
+        dialogueBox.innerHTML = `<strong>ヒロイン:</strong> 「${text}」`;
+    }
+
+    function changeExpression(exp) {
+        document.getElementById('character-img').src = expressions[exp];
+    }
+
+    function closeSubMenu() {
+        document.getElementById('action-menu').style.display = 'flex';
+        document.querySelectorAll('.sub-menu').forEach(el => el.style.display = 'none');
+    }
+
+    function work() {
+        showMessage("え、仕事？いいよ、手伝ってあげる。でも、簡単じゃないからね！<br>（将来、ここにミニゲームが追加されます。）");
+        changeExpression('smile');
+        state.money += 2000;
+        updateUI();
+    }
+
+    function openShop() {
+        document.getElementById('action-menu').style.display = 'none';
+        document.getElementById('sub-menu-shop').style.display = 'flex';
+        showMessage("いらっしゃいませ。何を買いますか？");
+    }
+
+    function buyItem() {
+        const select = document.getElementById('shop-select');
+        const price = parseInt(select.value);
+        const itemName = select.options[select.selectedIndex].text.split(" ")[0];
+
+        if (state.money >= price) {
+            state.money -= price;
+            state.inventory[itemName]++;
+            updateUI();
+            showMessage(`（${itemName}を購入した！）`);
+        } else {
+            showMessage("（お金が足りない…）");
+        }
+    }
+
+    function openGift() {
+        const select = document.getElementById('gift-select');
+        select.innerHTML = '';
+        let hasItem = false;
+        
+        for (let item in state.inventory) {
+            if (state.inventory[item] > 0) {
+                let option = document.createElement('option');
+                option.value = item;
+                option.innerText = `${item} (所持: ${state.inventory[item]})`;
+                select.appendChild(option);
+                hasItem = true;
+            }
+        }
+
+        if (!hasItem) {
+            showMessage("（プレゼントできるアイテムを持っていない…）");
+            return;
+        }
+
+        document.getElementById('action-menu').style.display = 'none';
+        document.getElementById('sub-menu-gift').style.display = 'flex';
+        showMessage("えっ、私に何かくれるの…？");
+    }
+
+    function giveGift() {
+        const select = document.getElementById('gift-select');
+        const itemName = select.value;
+
+        if (state.inventory[itemName] > 0) {
+            state.inventory[itemName]--;
+            
+            // 好感度の上昇量を 30 と 50 に変更
+            if (itemName === "ケーキ") {
+                state.affection += 30;
+                changeExpression('close');
+                showMessage("ん〜！美味しいっ！甘いもの大好きなんだ、ありがとう！");
+            } else if (itemName === "ネックレス") {
+                state.affection += 50;
+                changeExpression('smile');
+                showMessage("えっ…こんな可愛いもの…！すごく嬉しい、大切にするね…！");
+            }
+            updateUI();
+            closeSubMenu();
+        }
+    }
+
+    function confess() {
+        if (state.affection >= 100) {
+            changeExpression('smile');
+            showMessage("……うん。私も、ずっと前から好きでした。よろしくお願いします…！\n【HAPPY END】");
+            document.getElementById('action-menu').style.display = 'none';
+        } else {
+            changeExpression('angry');
+            showMessage("は？急に何言ってるの？私たちまだそんなに仲良くないでしょ！からかわないでよね！");
+        }
+    }
+
+    function openChat() {
+        document.getElementById('action-menu').style.display = 'none';
+        document.getElementById('sub-menu-chat').style.display = 'flex';
+        document.getElementById('chat-input').value = '';
+    }
+
+    async function sendChat() {
+        const inputStr = document.getElementById('chat-input').value;
+        if (!inputStr) return;
+
+        closeSubMenu();
+        showMessage("（考え中...）");
+
+        // 本物のAIかダミーかを判定して実行
+        let aiResponse;
+        if (GEMINI_API_KEY === "") {
+            aiResponse = await mockAiApi(inputStr); // キーが無ければダミー
+        } else {
+            aiResponse = await callRealGeminiApi(inputStr); // キーがあれば本物！
+        }
+
+        state.affection += aiResponse.affectionChange;
+        if (state.affection < 0) state.affection = 0;
+        
+        updateUI();
+        changeExpression(aiResponse.expression);
+        showMessage(aiResponse.reply);
+    }
+
+    // --- 本物の Gemini API を呼び出す処理 ---
+    async function callRealGeminiApi(userInput) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+        
+        // AIへの指示書き（プロンプト）
+        const prompt = `
+あなたは恋愛シミュレーションゲームのヒロインです。プレイヤーからの入力に対して、あなたの口調で返答してください。
+口調の例：
+- デフォルト: 「ふーん、そうなんだ。」「お疲れ様！無理しないでね。」
+- 喜ぶ: 「えっ…あ、ありがとう…！」
+- 怒る: 「なによ、いきなり！怒るよ！」
+- 少しツンデレ気味で、でも基本は素直な女の子です。
+
+以下のJSONフォーマットのみで厳密に出力してください（Markdownのコードブロックは不要です）。
+{
+  "reply": "プレイヤーへの返答セリフ（短め）",
+  "expression": "normal, close, smile, angry のいずれか一つ",
+  "affectionChange": 好感度の増減値（マイナス5〜プラス10の数値）
+}
+
+プレイヤーの入力: ${userInput}
+`;
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: { response_mime_type: "application/json" }
+                })
+            });
+            
+            const data = await response.json();
+            const resultText = data.candidates[0].content.parts[0].text;
+            return JSON.parse(resultText); // AIの返事をJSONとして読み込む
+            
+        } catch (error) {
+            console.error("AI API エラー:", error);
+            // エラーが起きた時のための安全策
+            return { 
+                reply: "ごめん、ちょっと考え事してた…もう一回言って？", 
+                expression: "normal", 
+                affectionChange: 0 
+            };
+        }
+    }
+
+    // --- ダミーAPI (APIキーがない時用) ---
+    function mockAiApi(userInput) {
+        return new Promise(resolve => {
+            setTimeout(() => {
+                let reply = "ふーん、そうなんだ。";
+                let exp = "normal";
+                let aff = 0;
+
+                if (userInput.includes("好き") || userInput.includes("かわいい")) {
+                    reply = "えっ…あ、ありがとう…！";
+                    exp = "smile";
+                    aff = 3;
+                } else if (userInput.includes("仕事") || userInput.includes("疲れた")) {
+                    reply = "お疲れ様！無理しないでね。";
+                    exp = "normal";
+                    aff = 2;
+                } else if (userInput.includes("バカ") || userInput.includes("嫌い")) {
+                    reply = "なによ、いきなり！怒るよ！";
+                    exp = "angry";
+                    aff = -5;
+                }
+
+                resolve({ reply: reply, expression: exp, affectionChange: aff });
+            }, 1000);
+        });
+    }
+
+    // 初期化
+    updateUI();
+</script>
+
 </body>
 </html>
